@@ -26,4 +26,17 @@ module cla4_dataflow(
 
   // TODO: your dataflow (assign) statements go here.
 
+  // Step 1: Generate and Propagate vectors
+  assign #(2) p = a ^ b;
+  assign #(2) g = a & b;
+
+  // Step 2: Lookahead Carry Equations(much easier)
+  assign #(2) c1   = g[0] | (p[0] & cin);
+  assign #(2) c2   = g[1] | (p[1] & g[0]) | (p[1] & p[0] & cin);
+  assign #(2) c3   = g[2] | (p[2] & g[1]) | (p[2] & p[1] & g[0]) | (p[2] & p[1] & p[0] & cin);
+  assign #(2) cout = g[3] | (p[3] & g[2]) | (p[3] & p[2] & g[1]) | (p[3] & p[2] & p[1] & g[0]) | (p[3] & p[2] & p[1] & p[0] & cin);
+
+  // Step 3: Sum Output vector
+  assign #(2) sum  = p ^ {c3, c2, c1, cin};
+
 endmodule
