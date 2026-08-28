@@ -22,7 +22,7 @@ module ripple_adder(
 
   wire c1, c2, c3;
 
-  // TODO: your four FA_Gate instances go here.
+  // Task 2 / Task 3a - Connected via exact bit indices
   FA_Gate fa0 (
     .a(a[0]),
     .b(b[0]),
