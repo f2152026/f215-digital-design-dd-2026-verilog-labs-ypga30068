@@ -26,10 +26,10 @@ module FA_Gate(
 );
   wire ps, pc1, pc2;
 //single const pair delay of 2(rise) and 5(fall)
-  xor #(2,5) (ps,  a,   b);
-  and #(2,5) (pc1, a,   b);
-  xor #(2,5) (sum, cin, ps);
-  and #(2,5) (pc2, cin, ps);
-  or #(2,5) (cout, pc1, pc2);
+  xor #(2) (ps,  a,   b);
+  and #(2) (pc1, a,   b);
+  xor #(2) (sum, cin, ps);
+  and #(2) (pc2, cin, ps);
+  or #(2) (cout, pc1, pc2);
 
 endmodule
