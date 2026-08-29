@@ -1,47 +1,59 @@
-// cla64_flat.v
-// A flat, unblocked 64-bit carry-lookahead adder: every carry is computed
-// directly (two-level, no rippling), exactly like cla4.v, just scaled to
-// 64 bits. Add delays throughout (same convention as cla4.v) so it can be
-// fairly compared against rca64.v and cla64_blocked.v.
-
-module cla64_flat(
-  input  [63:0] a,
-  input  [63:0] b,
-  input         cin,
-  output [63:0] sum,
-  output        cout
+module cla64_flat (
+    input  [63:0] a,
+    input  [63:0] b,
+    input         cin,
+    output [63:0] sum,
+    output        cout
 );
+    wire [63:0] p, g;
+    wire [64:0] c;
+    
+    assign c[0] = cin;
+    
+    // P, G, and Sum generation
+    genvar i;
+    generate
+        for (i = 0; i < 64; i = i + 1) begin : pg_gen
+            assign p[i] = a[i] ^ b[i];
+            assign g[i] = a[i] & b[i];
+            assign sum[i] = p[i] ^ c[i];
+        end
+    endgenerate
 
-  wire [63:0] p, g;
-  wire [64:1] c;   // c[1]..c[64] are the 64 carries; think of cin as c[0]
-
-  // ---------------------------------------------------------------------
-  // Step 1: generate/propagate signals
-  // ---------------------------------------------------------------------
-  genvar i;
-  generate
-    for (i = 0; i < 64; i = i + 1) begin : gen_pg
-      xor #(2) (p[i], a[i], b[i]);
-      and #(2) (g[i], a[i], b[i]);
-    end
-  endgenerate
-
-  // ---------------------------------------------------------------------
-  // Step 2: the 64 direct carry equations
-  // ---------------------------------------------------------------------
-  // Verified c[1]..c[4] equations matching cla4.v, extended up to c[8]:
-  assign #(2) c[1] = g[0] | (p[0] & cin);
-  assign #(2) c[2] = g[1] | (p[1] & g[0]) | (p[1] & p[0] & cin);
-  assign #(2) c[3] = g[2] | (p[2] & g[1]) | (p[2] & p[1] & g[0]) | (p[2] & p[1] & p[0] & cin);
-  assign #(2) c[4] = g[3] | (p[3] & g[2]) | (p[3] & p[2] & g[1]) | (p[3] & p[2] & p[1] & g[0]) | (p[3] & p[2] & p[1] & p[0] & cin);
-  
-  // NOTE: Paste the output of the provided python script here for c[5] through c[64]!
-  
-  assign cout = c[64];
-
-  // ---------------------------------------------------------------------
-  // Step 3: sum bits
-  // ---------------------------------------------------------------------
-  assign #(2) sum = p ^ {c[63:1], cin};
+    // Flat carry generation using bitwise masks to bypass dynamic bit-slicing errors
+    genvar k, j;
+    generate
+        for (k = 1; k <= 64; k = k + 1) begin : flat_carry
+            wire [64:0] terms;
+            
+            // First term is always just the generate of the previous bit
+            assign terms[0] = g[k-1];
+            
+            // Middle terms
+            for (j = 1; j < k; j = j + 1) begin : mid_terms
+                // Create a 64-bit mask with 1s in the range we want to AND together
+                wire [63:0] mask = ((65'b1 << j) - 1) << (k - j);
+                
+                // Force unneeded bits of p to 1, then do a reduction AND
+                wire [63:0] p_masked = p | ~mask;
+                assign terms[j] = g[k - 1 - j] & (&p_masked);
+            end
+            
+            // Set unused terms for this bit position to 0
+            for (j = k; j < 64; j = j + 1) begin : zero_terms
+                assign terms[j] = 1'b0;
+            end
+            
+            // Final term: Cin ANDed with all previous propagates
+            wire [63:0] mask_cin = (65'b1 << k) - 1;
+            wire [63:0] p_masked_cin = p | ~mask_cin;
+            assign terms[64] = cin & (&p_masked_cin);
+            
+            // The flat carry is simply the OR of all calculated terms
+            assign c[k] = |terms;
+        end
+    endgenerate
+    
+    assign cout = c[64];
 
 endmodule
